@@ -3,9 +3,14 @@ package app.index;
 import androidx.appcompat.app.AppCompatActivity;
 
 import android.os.Bundle;
-import android.widget.TextView;
+import androidx.appcompat.app.AppCompatActivity;
+import android.os.Bundle;
+
+import android.graphics.Bitmap;
+import android.graphics.Canvas;
 
 import app.index.databinding.ActivityMainBinding;
+
 
 public class MainActivity extends AppCompatActivity {
 
@@ -19,12 +24,17 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-
         binding = ActivityMainBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
-        // Example of a call to a native method
-        TextView tv = binding.sampleText;
-        tv.setText(stringFromJNI());
+
+        // Area de dibujo
+        DrawingView areaDibujo = binding.drawingView;
+
+        binding.buttonClassify.setOnClickListener(view -> {
+            // Por ahora solo probamos que se capture el bitmap
+            Bitmap dibujo = areaDibujo.getBitmap();
+            // TODO: lo convertibles a Mat y llamaremos classifyShape(...)
+        });
     }
 
     /**

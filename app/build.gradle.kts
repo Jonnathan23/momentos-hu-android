@@ -13,6 +13,12 @@ android {
         versionCode = 1
         versionName = "1.0"
 
+        ndk {
+            // Kotlin DSL exige que modifiques la colección, no que pases argumentos
+            abiFilters += "armeabi-v7a"
+            abiFilters += "arm64-v8a"
+        }
+
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
