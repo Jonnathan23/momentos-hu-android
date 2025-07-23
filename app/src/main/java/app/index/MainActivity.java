@@ -6,7 +6,8 @@ import android.graphics.Bitmap;
 import app.index.databinding.ActivityMainBinding;
 import android.util.Log;
 import java.util.Arrays;
-
+import java.util.List;
+import java.util.Map;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -30,47 +31,51 @@ public class MainActivity extends AppCompatActivity {
 
         binding.buttonClassify.setOnClickListener(view -> {
             // 1) Capturar bitmap
-            // 1) Capturar bitmap
-            Bitmap dibujo = areaDibujo.getBitmap();
+            Bitmap bmp = binding.drawingView.getBitmap();
 
-            // 2) Llamar a la función nativa
-            float[] descriptor = computeHuDescriptor(dibujo);
-            Log.i("DEBUG", "Descriptor usuario: " + Arrays.toString(descriptor));
+            float[] huDesc  = computeHuDescriptor(bmp);
+            float[] sigDesc = computeShapeSignature(bmp);
 
-            // 3) Clasificar con el método de vecino más cercano
-            String etiqueta = classifyDescriptor(descriptor);
-
-            // 4) Mostrar la etiqueta en el TextView
+            String etiqueta = classifyTwoStage(huDesc, sigDesc);
             binding.textFigure.setText(etiqueta);
+        });
+
+        binding.buttonClear.setOnClickListener(v -> {
+            // Limpia la zona de dibujo
+            binding.drawingView.clear();
+            binding.textFigure.setText("");
         });
     }
 
-    public native float[] computeHuDescriptor(Bitmap bitmap);
-
-    private String classifyDescriptor(float[] descriptor) {
-        String[] clases = {"circle","square","triangle"};
-        String mejor = null;
-        double mejorDist = Double.MAX_VALUE;
-
-        for (String clase : clases) {
-            float[] huRef = DescriptorUtils.getHuMoments(clase);
-            double dist = 0;
-            for (int i = 0; i < descriptor.length; i++) {
-                double d = descriptor[i] - huRef[i];
-                dist += d * d;
-            }
-            dist = Math.sqrt(dist);
-
-            Log.i("DEBUG", String.format("Clase=%s, dist=%.4f", clase, dist));
-
-            if (dist < mejorDist) {
-                mejorDist = dist;
-                mejor = clase;
-            }
+    /** Stage 1: Hu para “circle” vs “other”; Stage 2: Signature para square vs triangle */
+    private String classifyTwoStage(float[] huDesc, float[] sigDesc) {
+        // 1) Hu-distance a círculos
+        double minHuCir = minDistance(huDesc, DescriptorUtils.getHuList("circle"));
+        if (minHuCir <= DescriptorUtils.getThreshold("circle")) {
+            return "circle";
         }
 
-        // Devolvemos siempre la mejor, sin threshold
-        return mejor != null ? mejor : "desconocido";
+        // 2) Ahora polígonos: Signature
+        double minSigSq  = minDistance(sigDesc, DescriptorUtils.getSignatureList("square"));
+        double minSigTri = minDistance(sigDesc, DescriptorUtils.getSignatureList("triangle"));
+        return (minSigSq < minSigTri) ? "square" : "triangle";
     }
 
+    // Distancia mínima de usuario→lista de refs
+    private double minDistance(float[] user, List<float[]> refs) {
+        double best = Double.MAX_VALUE;
+        for (float[] ref : refs) {
+            double s = 0;
+            for (int i = 0; i < user.length; i++) {
+                double d = user[i] - ref[i];
+                s += d*d;
+            }
+            best = Math.min(best, Math.sqrt(s));
+        }
+        return best;
+    }
+
+    // Declaración de JNI
+    public native float[] computeHuDescriptor(Bitmap bitmap);
+    public native float[] computeShapeSignature(Bitmap bitmap);
 }

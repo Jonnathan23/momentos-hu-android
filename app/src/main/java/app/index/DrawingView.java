@@ -20,7 +20,7 @@ public class DrawingView extends View {
         inicializar();
     }
 
-    // 2) Configuración inicial del pincel y fondo
+    /** @description Configuración inicial del pincel y fondo */
     private void inicializar() {
         pincel.setColor(Color.BLACK);
         pincel.setStyle(Paint.Style.STROKE);
@@ -28,7 +28,13 @@ public class DrawingView extends View {
         setBackgroundColor(Color.WHITE);
     }
 
-    // 3) Dibujar en pantalla lo que el usuario ha trazado
+    /**@description Borra todo el trazo */
+    public void clear() {
+        trazo.reset();
+        invalidate();  // fuerza redraw
+    }
+
+    /**@description Dibujar en pantalla lo que el usuario ha trazado */
     @Override
     protected void onDraw(Canvas lienzo) {
         super.onDraw(lienzo);

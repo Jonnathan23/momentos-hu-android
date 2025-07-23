@@ -6,82 +6,88 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 
 public class DescriptorUtils {
-    private static final Map<String, float[]> huMomentMap = new HashMap<>();
-    private static final Map<String, float[]> shapeSignatureMap = new HashMap<>();
+    private static final Map<String, List<float[]>> huMomentList = new HashMap<>();
+    private static final Map<String, List<float[]>> shapeSignatureList = new HashMap<>();
     private static final Map<String, Float> classThresholdMap = new HashMap<>();
     private static boolean initialized = false;
 
     private DescriptorUtils() {
-        // Evita instanciación
+        // No instanciable
     }
 
     /**
-     * @description Inicia la carga de los CSVs de descriptores y establece los umbrales.
-     * Es idempotente: solo carga la primera vez.
+     * Inicializa cargando todos los CSV y umbrales.
+     * Idempotente: solo carga la primera vez.
      */
     public static void init(AssetManager assets) {
         if (initialized) return;
-        // Cargar Hu moments y Shape Signatures, saltando columna de imagen
-        readDescriptorCsv(assets, "hu_moments.csv", huMomentMap);
-        readDescriptorCsv(assets, "shape_signature.csv", shapeSignatureMap);
-        // Umbrales normalizados (constantes en código)
+
+        // Carga listas completas de descriptores
+        huMomentList.putAll(readAll(assets, "hu_moments.csv"));
+        shapeSignatureList.putAll(readAll(assets, "shape_signature.csv"));
+
+        // Umbrales precomputados (desde script externo)
         classThresholdMap.put("circle",   1.3028271f);
         classThresholdMap.put("square",   1.6212168f);
         classThresholdMap.put("triangle", 1.7396645f);
+
         initialized = true;
     }
 
     /**
-     * @description Lee un CSV donde la primera columna es la etiqueta y la segunda es el nombre de imagen,
-     * y las columnas siguientes son valores numéricos.
-     * Se salta la cabecera y la columna de imagen.
+     * Lee un CSV completo y devuelve un mapa label → lista de vectores.
+     * Se salta cabecera y columna de imagen, e ignora valores no numéricos.
      */
-    private static void readDescriptorCsv(AssetManager assets, String fileName, Map<String, float[]> map) {
+    private static Map<String, List<float[]>> readAll(
+            AssetManager assets, String fileName) {
+        Map<String, List<float[]>> temp = new HashMap<>();
         try (InputStream is = assets.open(fileName);
              BufferedReader reader = new BufferedReader(new InputStreamReader(is))) {
             String line;
-            boolean isFirstLine = true;
+            boolean firstLine = true;
             while ((line = reader.readLine()) != null) {
-                if (isFirstLine) {  // saltamos header
-                    isFirstLine = false;
-                    continue;
-                }
+                if (firstLine) { firstLine = false; continue; }
                 String[] parts = line.split(",");
                 if (parts.length < 3) continue;
                 String label = parts[0];
-                int count = parts.length - 2;  // omitimos parts[1]
-                float[] values = new float[count];
+                int dim = parts.length - 2; // omitimos etiqueta e imagen
+                float[] vals = new float[dim];
                 for (int i = 2; i < parts.length; i++) {
                     try {
-                        values[i - 2] = Float.parseFloat(parts[i]);
+                        vals[i - 2] = Float.parseFloat(parts[i]);
                     } catch (NumberFormatException nfe) {
-                        Log.w("DescriptorUtils", "Valor no numérico en " + fileName + ": " + parts[i], nfe);
-                        values[i - 2] = 0f;
+                        Log.w("DescriptorUtils",
+                                "Valor no numérico en " + fileName + ": " + parts[i]);
+                        vals[i - 2] = 0f;
                     }
                 }
-                map.put(label, values);
+                temp.computeIfAbsent(label, k -> new ArrayList<>()).add(vals);
             }
         } catch (IOException e) {
-            Log.e("DescriptorUtils", "Error cargando " + fileName, e);
+            Log.e("DescriptorUtils", "Error leyendo " + fileName, e);
         }
+        return temp;
     }
 
-    public static float[] getHuMoments(String label) {
+    public static List<float[]> getHuList(String label) {
         ensureInit();
-        return huMomentMap.get(label);
+        return huMomentList.getOrDefault(label, Collections.emptyList());
     }
 
-    public static float[] getShapeSignature(String label) {
+    public static List<float[]> getSignatureList(String label) {
         ensureInit();
-        return shapeSignatureMap.get(label);
+        return shapeSignatureList.getOrDefault(label, Collections.emptyList());
     }
 
-    public static float getClassThreshold(String label) {
+    public static float getThreshold(String label) {
         ensureInit();
         Float t = classThresholdMap.get(label);
         return t != null ? t : Float.NaN;
