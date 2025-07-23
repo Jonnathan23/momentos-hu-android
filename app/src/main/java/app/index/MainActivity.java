@@ -1,15 +1,11 @@
 package app.index;
 
 import androidx.appcompat.app.AppCompatActivity;
-
 import android.os.Bundle;
-import androidx.appcompat.app.AppCompatActivity;
-import android.os.Bundle;
-
 import android.graphics.Bitmap;
-import android.graphics.Canvas;
-
 import app.index.databinding.ActivityMainBinding;
+import android.util.Log;
+import java.util.Arrays;
 
 
 public class MainActivity extends AppCompatActivity {
@@ -27,19 +23,54 @@ public class MainActivity extends AppCompatActivity {
         binding = ActivityMainBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
 
+        DescriptorUtils.init(getAssets());
+
         // Area de dibujo
         DrawingView areaDibujo = binding.drawingView;
 
         binding.buttonClassify.setOnClickListener(view -> {
-            // Por ahora solo probamos que se capture el bitmap
+            // 1) Capturar bitmap
+            // 1) Capturar bitmap
             Bitmap dibujo = areaDibujo.getBitmap();
-            // TODO: lo convertibles a Mat y llamaremos classifyShape(...)
+
+            // 2) Llamar a la función nativa
+            float[] descriptor = computeHuDescriptor(dibujo);
+            Log.i("DEBUG", "Descriptor usuario: " + Arrays.toString(descriptor));
+
+            // 3) Clasificar con el método de vecino más cercano
+            String etiqueta = classifyDescriptor(descriptor);
+
+            // 4) Mostrar la etiqueta en el TextView
+            binding.textFigure.setText(etiqueta);
         });
     }
 
-    /**
-     * A native method that is implemented by the 'index' native library,
-     * which is packaged with this application.
-     */
-    public native String stringFromJNI();
+    public native float[] computeHuDescriptor(Bitmap bitmap);
+
+    private String classifyDescriptor(float[] descriptor) {
+        String[] clases = {"circle","square","triangle"};
+        String mejor = null;
+        double mejorDist = Double.MAX_VALUE;
+
+        for (String clase : clases) {
+            float[] huRef = DescriptorUtils.getHuMoments(clase);
+            double dist = 0;
+            for (int i = 0; i < descriptor.length; i++) {
+                double d = descriptor[i] - huRef[i];
+                dist += d * d;
+            }
+            dist = Math.sqrt(dist);
+
+            Log.i("DEBUG", String.format("Clase=%s, dist=%.4f", clase, dist));
+
+            if (dist < mejorDist) {
+                mejorDist = dist;
+                mejor = clase;
+            }
+        }
+
+        // Devolvemos siempre la mejor, sin threshold
+        return mejor != null ? mejor : "desconocido";
+    }
+
 }
