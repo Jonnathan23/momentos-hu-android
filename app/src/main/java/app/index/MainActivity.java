@@ -50,15 +50,18 @@ public class MainActivity extends AppCompatActivity {
     /** Stage 1: Hu para “circle” vs “other”; Stage 2: Signature para square vs triangle */
     private String classifyTwoStage(float[] huDesc, float[] sigDesc) {
         // 1) Hu-distance a círculos
-        double minHuCir = minDistance(huDesc, DescriptorUtils.getHuList("circle"));
-        if (minHuCir <= DescriptorUtils.getThreshold("circle")) {
+        // 0) Stage 0: detectamos círculo por uniformidad de la firma
+        if (isCircleBySignature(sigDesc)) {
+            Log.i("DEBUG", "Detected circle by signature uniformity");
             return "circle";
         }
 
-        // 2) Ahora polígonos: Signature
+        // 2) Stage 2: polígonos → square vs triangle usando la signature
         double minSigSq  = minDistance(sigDesc, DescriptorUtils.getSignatureList("square"));
         double minSigTri = minDistance(sigDesc, DescriptorUtils.getSignatureList("triangle"));
-        return (minSigSq < minSigTri) ? "square" : "triangle";
+        String polyClass = (minSigSq < minSigTri) ? "square" : "triangle";
+        Log.i("DEBUG", String.format("Sig dist → square=%.1f, triangle=%.1f", minSigSq, minSigTri));
+        return polyClass;
     }
 
     // Distancia mínima de usuario→lista de refs
@@ -73,6 +76,21 @@ public class MainActivity extends AppCompatActivity {
             best = Math.min(best, Math.sqrt(s));
         }
         return best;
+    }
+
+    /**
+     * Un círculo perfecto tendrá todos los samples de la signature casi iguales.
+     * Calculamos (max-min)/max y lo comparamos contra un pequeño umbral.
+     */
+    private boolean isCircleBySignature(float[] sigDesc) {
+        if (sigDesc == null || sigDesc.length == 0) return false;
+        float min = Float.MAX_VALUE, max = Float.MIN_VALUE;
+        for (float v : sigDesc) {
+            if (v < min) min = v;
+            if (v > max) max = v;
+        }
+        // Si la variación relativa es < 10%, lo consideramos un círculo
+        return (max - min) / max < 0.10f;
     }
 
     // Declaración de JNI
